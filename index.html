@@ -144,172 +144,320 @@
 
         <button type="submit">จองห้องพัก</button>
     </form>
-   <script>
-    document.getElementById('bookingForm').addEventListener('submit', function(e) {
+
+    <script>
+    // Initialize elements and constants
+    const form = document.getElementById('bookingForm');
+    const elFullname = document.getElementById('fullname');
+    const elEmail = document.getElementById('email');
+    const elPhone = document.getElementById('phone');
+    const elCheckin = document.getElementById('checkin');
+    const elCheckout = document.getElementById('checkout');
+    const elRoomtype = document.getElementById('roomtype');
+    const elGuests = document.getElementById('guests');
+
+    // วันนี้ (ตั้งเวลา 0:00:00 สำหรับการเปรียบเทียบ)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString().split('T')[0];
+
+    // แมปประเภทห้องกับจำนวนผู้เข้าพักสูงสุด
+    const roomMaxGuests = {
+        'standard': 2,
+        'deluxe': 3,
+        'suite': 4
+    };
+
+    // ====== INITIALIZATION ======
+    
+    // ตั้งค่าวันเช็คอินขั้นต่ำเป็นวันนี้
+    elCheckin.min = todayISO;
+
+    // ====== REAL-TIME VALIDATION LISTENERS ======
+
+    // ตรวจสอบวันเช็คอิน Real-time
+    elCheckin.addEventListener('change', function() {
+        const checkinDate = new Date(this.value);
+        checkinDate.setHours(0, 0, 0, 0);
+
+        // ตรวจสอบว่าวันเช็คอินไม่เป็นวันที่ผ่านมาแล้ว
+        if (this.value && checkinDate < today) {
+            this.value = '';
+            alert('⚠️ วันเช็คอินต้องไม่เป็นวันที่ผ่านมาแล้ว');
+            return;
+        }
+
+        // อัปเดต checkout.min ให้มีค่ามากกว่า checkin
+        if (this.value) {
+            const nextDay = new Date(checkinDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDayISO = nextDay.toISOString().split('T')[0];
+            elCheckout.min = nextDayISO;
+
+            // ถ้า checkout น้อยกว่า checkin ให้ล้างค่า checkout
+            if (elCheckout.value && elCheckout.value < nextDayISO) {
+                elCheckout.value = '';
+            }
+        }
+    });
+
+    // ตรวจสอบวันเช็คเอาท์ Real-time
+    elCheckout.addEventListener('change', function() {
+        if (!elCheckin.value || !this.value) return;
+
+        const checkinDate = new Date(elCheckin.value);
+        const checkoutDate = new Date(this.value);
+
+        // ตรวจสอบว่าเช็คเอาท์มาหลังเช็คอิน
+        if (checkoutDate <= checkinDate) {
+            this.value = '';
+            alert('⚠️ วันเช็คเอาท์ต้องมาหลังวันเช็คอิน');
+        }
+    });
+
+    // ตรวจสอบเบอร์โทร Real-time
+    elPhone.addEventListener('change', function() {
+        const phone = this.value.trim();
+        if (phone && !/^[0-9]{10}$/.test(phone)) {
+            alert('⚠️ เบอร์โทรต้องมี 10 หลัก');
+            this.value = '';
+        }
+    });
+
+    // ปรับจำนวนผู้เข้าพักตามประเภทห้อง
+    elRoomtype.addEventListener('change', function() {
+        const maxGuests = roomMaxGuests[this.value] || 4;
+        elGuests.max = maxGuests;
+
+        // ถ้าจำนวนผู้เข้าพักมากกว่าสูงสุด ให้ปรับลดลง
+        if (parseInt(elGuests.value) > maxGuests) {
+            elGuests.value = maxGuests;
+        }
+    });
+
+    // ====== HELPER FUNCTIONS ======
+
+    // แสดงข้อความแจ้งเตือนแบบ Toast
+    function showToast(message, duration = 2200) {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        Object.assign(toast.style, {
+            position: 'fixed',
+            bottom: '18px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#333',
+            color: '#fff',
+            padding: '12px 18px',
+            borderRadius: '6px',
+            zIndex: '9999',
+            fontSize: '14px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+        });
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), duration);
+    }
+
+    // แสดง Modal confirm
+    function showConfirmModal(title, message) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            Object.assign(overlay.style, {
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: '9999'
+            });
+
+            const modal = document.createElement('div');
+            Object.assign(modal.style, {
+                background: '#fff',
+                padding: '20px',
+                borderRadius: '8px',
+                maxWidth: '550px',
+                width: '90%',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+            });
+
+            // Title
+            const titleEl = document.createElement('h3');
+            titleEl.textContent = title;
+            Object.assign(titleEl.style, {
+                margin: '0 0 12px 0',
+                color: '#2c3e50',
+                fontSize: '18px'
+            });
+
+            // Message
+            const messageEl = document.createElement('div');
+            messageEl.textContent = message;
+            Object.assign(messageEl.style, {
+                whiteSpace: 'pre-wrap',
+                margin: '0 0 20px 0',
+                lineHeight: '1.6',
+                color: '#34495e',
+                fontSize: '14px'
+            });
+
+            // Buttons
+            const buttonContainer = document.createElement('div');
+            Object.assign(buttonContainer.style, {
+                display: 'flex',
+                gap: '8px',
+                justifyContent: 'flex-end'
+            });
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'ยกเลิก';
+            Object.assign(cancelBtn.style, {
+                background: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+            });
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = 'ยืนยัน';
+            Object.assign(confirmBtn.style, {
+                background: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                overlay.remove();
+                resolve(false);
+            });
+
+            confirmBtn.addEventListener('click', () => {
+                overlay.remove();
+                resolve(true);
+            });
+
+            buttonContainer.appendChild(cancelBtn);
+            buttonContainer.appendChild(confirmBtn);
+            modal.appendChild(titleEl);
+            modal.appendChild(messageEl);
+            modal.appendChild(buttonContainer);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+        });
+    }
+
+    // ====== FORM SUBMISSION ======
+
+    form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
-        // ตรวจสอบวันที่
-        const checkin = new Date(document.getElementById('checkin').value);
-        const checkout = new Date(document.getElementById('checkout').value);
-        const today = new Date();
-        
-        if (checkin < today) {
-            alert('กรุณาเลือกวันเช็คอินที่ยังไม่ผ่านมา');
+
+        // 1. ตรวจสอบความถูกต้องครั้งแรกด้วย HTML5 Validation
+        if (!form.checkValidity()) {
+            form.reportValidity();
             return;
         }
-        
-        if (checkout <= checkin) {
-            alert('วันเช็คเอาท์ต้องมาหลังวันเช็คอิน');
+
+        // 2. ตรวจสอบวันเช็คอิน
+        const checkinStr = elCheckin.value;
+        const checkinDate = new Date(checkinStr);
+        checkinDate.setHours(0, 0, 0, 0);
+
+        if (!checkinStr || checkinDate < today) {
+            elCheckin.setCustomValidity('วันเช็คอินต้องไม่เป็นวันที่ผ่านมาแล้ว');
+            elCheckin.reportValidity();
+            elCheckin.setCustomValidity('');
             return;
         }
-        
-        // ตรวจสอบรูปแบบเบอร์โทร
-        const phone = document.getElementById('phone').value;
-        const phoneRegex = /^[0-9]{10}$/;
-        if (!phoneRegex.test(phone)) {
-            alert('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (10 หลัก)');
+
+        // 3. ตรวจสอบวันเช็คเอาท์
+        const checkoutStr = elCheckout.value;
+        const checkoutDate = new Date(checkoutStr);
+        checkoutDate.setHours(0, 0, 0, 0);
+
+        if (!checkoutStr || checkoutDate <= checkinDate) {
+            elCheckout.setCustomValidity('วันเช็คเอาท์ต้องมาหลังวันเช็คอิน');
+            elCheckout.reportValidity();
+            elCheckout.setCustomValidity('');
             return;
         }
-        
-        // คำนวณจำนวนวันที่พัก
-        const days = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
-        
-        // แสดงสรุปการจอง
-        const roomtype = document.getElementById('roomtype');
-        const roomtypeText = roomtype.options[roomtype.selectedIndex].text;
-        
-        const summary = `
-            สรุปการจอง:
-            - ชื่อผู้จอง: ${document.getElementById('fullname').value}
-            - ประเภทห้อง: ${roomtypeText}
-            - วันที่เข้าพัก: ${checkin.toLocaleDateString('th-TH')}
-            - วันที่ออก: ${checkout.toLocaleDateString('th-TH')}
-            - จำนวนวันที่พัก: ${days} วัน
-            - จำนวนผู้เข้าพัก: ${document.getElementById('guests').value} ท่าน
-        `;
-        
-        if (confirm(summary + '\n\nยืนยันการจองห้องพัก?')) {
-            alert('จองห้องพักเรียบร้อยแล้ว');
-            this.reset();
+
+        // 4. ตรวจสอบเบอร์โทรศัพท์
+        const phone = elPhone.value.trim();
+        if (!/^[0-9]{10}$/.test(phone)) {
+            elPhone.setCustomValidity('เบอร์โทรต้องมี 10 หลัก (เลขอารบิกเท่านั้น)');
+            elPhone.reportValidity();
+            elPhone.setCustomValidity('');
+            return;
         }
+
+        // 5. คำนวณจำนวนวันพัก
+        const daysStay = Math.ceil((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
+
+        // 6. เตรียมข้อมูลสรุปการจอง
+        const roomText = elRoomtype.options[elRoomtype.selectedIndex].text;
+        const summary = `ชื่อ-นามสกุล: ${elFullname.value}
+อีเมล: ${elEmail.value}
+เบอร์โทรศัพท์: ${phone}
+ประเภทห้องพัก: ${roomText}
+วันที่เช็คอิน: ${checkinDate.toLocaleDateString('th-TH')}
+วันที่เช็คเอาท์: ${checkoutDate.toLocaleDateString('th-TH')}
+จำนวนวันพัก: ${daysStay} วัน
+จำนวนผู้เข้าพัก: ${elGuests.value} ท่าน`;
+
+        // 7. แสดง Modal สรุปการจอง
+        const confirmed = await showConfirmModal('สรุปการจอง', summary);
+
+        if (!confirmed) {
+            showToast('❌ ยกเลิกการจอง');
+            return;
+        }
+
+        // 8. บันทึกข้อมูลการจอง (ใน localStorage เพื่อการบันทึก)
+        try {
+            const bookingData = {
+                fullname: elFullname.value,
+                email: elEmail.value,
+                phone: phone,
+                room: elRoomtype.value,
+                checkin: checkinStr,
+                checkout: checkoutStr,
+                daysStay: daysStay,
+                guests: parseInt(elGuests.value),
+                timestamp: new Date().toISOString()
+            };
+            
+            const bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+            bookings.unshift(bookingData);
+            localStorage.setItem('bookings', JSON.stringify(bookings.slice(0, 20)));
+        } catch(err) {
+            console.warn('ไม่สามารถบันทึกข้อมูลในระบบ:', err);
+        }
+
+        // 9. แสดงข้อความสำเร็จ
+        showToast('✅ จองห้องพักเรียบร้อยแล้ว');
+
+        // 10. รีเซ็ตฟอร์ม
+        form.reset();
+        elCheckin.min = todayISO;
+        elCheckout.min = '';
+        elGuests.max = 4;
     });
-
-    // เพิ่มการตรวจสอบวันที่แบบ Real-time
-    document.getElementById('checkin').addEventListener('change', function() {
-        document.getElementById('checkout').min = this.value;
-    });
-
-    // จำกัดจำนวนผู้เข้าพักตามประเภทห้อง
-    document.getElementById('roomtype').addEventListener('change', function() {
-        const guestsInput = document.getElementById('guests');
-        if (this.value === 'standard') {
-            guestsInput.max = 2;
-        } else if (this.value === 'deluxe') {
-            guestsInput.max = 3;
-        } else if (this.value === 'suite') {
-            guestsInput.max = 4;
-        }
-        
-        if (guestsInput.value > guestsInput.max) {
-            guestsInput.value = guestsInput.max;
-        }
-});
-                (function() {
-                    const form = document.getElementById('bookingForm');
-                    const el = id => document.getElementById(id);
-                    const inpCheckin = el('checkin');
-                    const inpCheckout = el('checkout');
-                    const inpPhone = el('phone');
-                    const inpRoom = el('roomtype');
-                    const inpGuests = el('guests');
-
-                    // ensure checkin can't be before today
-                    const todayISO = (new Date()).toISOString().split('T')[0];
-                    inpCheckin.min = todayISO;
-
-                    // map room -> max guests
-                    const roomMax = { standard:2, deluxe:3, suite:4 };
-
-                    // update checkout.min when checkin changes
-                    inpCheckin.addEventListener('change', () => {
-                        inpCheckout.min = inpCheckin.value || todayISO;
-                        if (inpCheckout.value && inpCheckout.value < inpCheckout.min) inpCheckout.value = '';
-                    });
-
-                    // update guests max when room changes
-                    inpRoom.addEventListener('change', () => {
-                        const max = roomMax[inpRoom.value] || 4;
-                        inpGuests.max = max;
-                        if (Number(inpGuests.value) > max) inpGuests.value = max;
-                    });
-
-                    // tiny UI helpers
-                    const toast = msg => {
-                        const t = document.createElement('div');
-                        t.textContent = msg;
-                        Object.assign(t.style, {position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',background:'#111',color:'#fff',padding:'8px 12px',borderRadius:'8px',zIndex:9999});
-                        document.body.appendChild(t);
-                        setTimeout(()=>t.remove(),2200);
-                    };
-
-                    // modal confirm (returns Promise<boolean>)
-                    const modalConfirm = (html) => new Promise(resolve => {
-                        const overlay = document.createElement('div');
-                        Object.assign(overlay.style, {position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999});
-                        const box = document.createElement('div');
-                        Object.assign(box.style, {background:'#fff',padding:'16px',borderRadius:'8px',maxWidth:'520px',width:'90%',boxSizing:'border-box',fontFamily:'inherit'});
-                        box.innerHTML = `<div style="white-space:pre-wrap;margin-bottom:12px">${html}</div>`;
-                        const bCancel = document.createElement('button'); bCancel.textContent='ยกเลิก';
-                        const bOk = document.createElement('button'); bOk.textContent='ยืนยัน';
-                        Object.assign(bOk.style, {marginLeft:'8px',background:'#16a34a',color:'#fff',border:'none',padding:'8px 12px',borderRadius:'6px',cursor:'pointer'});
-                        Object.assign(bCancel.style, {background:'#ef4444',color:'#fff',border:'none',padding:'8px 12px',borderRadius:'6px',cursor:'pointer'});
-                        const actions = document.createElement('div'); actions.style.textAlign='right'; actions.appendChild(bCancel); actions.appendChild(bOk);
-                        box.appendChild(actions); overlay.appendChild(box); document.body.appendChild(overlay);
-                        bCancel.addEventListener('click', ()=>{ overlay.remove(); resolve(false); });
-                        bOk.addEventListener('click', ()=>{ overlay.remove(); resolve(true); });
-                    });
-
-                    // store bookings in localStorage (demo)
-                    const saveBooking = b => {
-                        try {
-                            const list = JSON.parse(localStorage.getItem('bookings')||'[]');
-                            list.unshift(b);
-                            localStorage.setItem('bookings', JSON.stringify(list.slice(0,10)));
-                        } catch(e) { console.warn(e); }
-                    };
-
-                    // submit handler
-                    form.addEventListener('submit', async (ev) => {
-                        ev.preventDefault();
-
-                        // use HTML5 constraint validation first
-                        if (!form.checkValidity()) { form.reportValidity(); return; }
-
-                        const checkin = new Date(inpCheckin.value);
-                        const checkout = new Date(inpCheckout.value);
-                        const now = new Date(); now.setHours(0,0,0,0);
-                        if (!inpCheckin.value || checkin < now) { inpCheckin.setCustomValidity('วันเช็คอินต้องเป็นวันนี้หรือวันถัดไป'); inpCheckin.reportValidity(); inpCheckin.setCustomValidity(''); return; }
-                        if (!inpCheckout.value || checkout <= checkin) { inpCheckout.setCustomValidity('วันเช็คเอาท์ต้องหลังวันเช็คอิน'); inpCheckout.reportValidity(); inpCheckout.setCustomValidity(''); return; }
-
-                        const phone = inpPhone.value.trim();
-                        if (!/^[0-9]{10}$/.test(phone)) { inpPhone.setCustomValidity('กรุณากรอกเบอร์โทร 10 หลัก'); inpPhone.reportValidity(); inpPhone.setCustomValidity(''); return; }
-
-                        const days = Math.ceil((checkout - checkin)/(1000*60*60*24));
-                        const roomText = inpRoom.options[inpRoom.selectedIndex].text;
-                        const summary = `สรุปการจอง:\n- ชื่อ: ${el('fullname').value}\n- ห้อง: ${roomText}\n- เข้า: ${checkin.toLocaleDateString('th-TH')}\n- ออก: ${checkout.toLocaleDateString('th-TH')}\n- วันพัก: ${days} วัน\n- ผู้เข้าพัก: ${inpGuests.value} ท่าน`;
-
-                        const ok = await modalConfirm(summary + '\n\nต้องการยืนยันหรือไม่?');
-                        if (!ok) { toast('ยกเลิกการจอง'); return; }
-
-                        // save and show toast
-                        saveBooking({fullname:el('fullname').value, phone, room:inpRoom.value, checkin:inpCheckin.value, checkout:inpCheckout.value, guests:inpGuests.value});
-                        toast('จองห้องพักเรียบร้อยแล้ว');
-                        form.reset();
-                        inpCheckin.min = todayISO; inpCheckout.min = '';
-                    });
-                })();
-
-</script>
+    </script>
 
 </script>
 </body>
